@@ -10,121 +10,97 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Service de traitement des différentes alertes basées sur les données du fichier JSON.
+ *
+ * Fournit des méthodes pour :
+ * - Obtenir les résidents par caserne ou adresse
+ * - Extraire les numéros de téléphone ou emails
+ * - Regrouper les foyers pour une alerte inondation
+ * - Calculer l'âge des individus
+ *
+ * Ce service centralise les logiques complexes de filtrage et de transformation de données.
+ */
 @Service
 public class AlertService {
 
     private final DataLoaderService dataLoaderService;
-
-    public AlertService(DataLoaderService dataLoaderService) {
+/**
+ * Constructeur injectant le service de chargement de données JSON.
+ * @param dataLoaderService Service d'accès aux données du fichier.
+ */
+ public AlertService(DataLoaderService dataLoaderService) {
         this.dataLoaderService = dataLoaderService;
     }
 
-    public int getAgeByName(String firstName, String lastName) throws IOException {
-        DataWrapper data = dataLoaderService.loadData();
-        Optional<MedicalRecord> record = data.getMedicalrecords().stream()
-                .filter(m -> m.getFirstName().equalsIgnoreCase(firstName)
-                        && m.getLastName().equalsIgnoreCase(lastName))
-                .findFirst();
-
-        if (record.isPresent()) {
-            String birthdate = record.get().getBirthdate();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy");
-            LocalDate birth = LocalDate.parse(birthdate, formatter);
-            return Period.between(birth, LocalDate.now()).getYears();
-        }
-        return 0;
-    }
-
-    public List<Person> getPersonsByStationNumber(int stationNumber) throws IOException {
-        DataWrapper data = dataLoaderService.loadData();
-        List<String> addresses = data.getFirestations().stream()
-                .filter(f -> f.getStation() == stationNumber)
-                .map(Firestation::getAddress)
-                .collect(Collectors.toList());
-
-        return data.getPersons().stream()
-                .filter(p -> addresses.contains(p.getAddress()))
-                .collect(Collectors.toList());
-    }
-
+    // ====== Méthodes publiques (API exposée) ======
+    /**
+     * Récupère les personnes desservies par une station de pompiers donnée,
+     * ainsi que le nombre d'adultes et d'enfants parmi eux.
+     *
+     * @param stationNumber Numéro de la station de pompiers
+     * @return Réponse structurée avec informations des personnes et comptage adultes/enfants
+     * @throws IOException en cas d'erreur de lecture du fichier de données
+     */
     public FirestationResponse getFirestationResponse(int stationNumber) throws IOException {
-        DataWrapper data = dataLoaderService.loadData();
+        DataWrapper data = loadData();
+        List<String> addresses = getAddressesByStations(Collections.singletonList(stationNumber), data);
 
-        List<String> addresses = data.getFirestations().stream()
-                .filter(f -> f.getStation() == stationNumber)
-                .map(Firestation::getAddress)
-                .collect(Collectors.toList());
-
-        List<Person> persons = data.getPersons().stream()
-                .filter(p -> addresses.contains(p.getAddress()))
-                .collect(Collectors.toList());
-
-        List<FirestationResponse.PersonInfo> infos = new ArrayList<>();
+        List<FirestationResponse.PersonInfo> personsInfo = new ArrayList<>();
         int adults = 0;
         int children = 0;
 
-        for (Person p : persons) {
-            int age = getAgeByName(p.getFirstName(), p.getLastName());
-            if (age < 18) children++;
-            else adults++;
+        for (Person p : data.getPersons()) {
+            if (addresses.contains(p.getAddress())) {
+                int age = computeAge(findBirthdate(p, data.getMedicalrecords()));
+                if (age < 18) children++;
+                else adults++;
 
-            FirestationResponse.PersonInfo info = new FirestationResponse.PersonInfo();
-            info.setFirstName(p.getFirstName());
-            info.setLastName(p.getLastName());
-            info.setAddress(p.getAddress());
-            info.setPhone(p.getPhone());
-
-            infos.add(info);
+                personsInfo.add(new FirestationResponse.PersonInfo(
+                        p.getFirstName(), p.getLastName(), p.getAddress(), p.getPhone()));
+            }
         }
 
-        FirestationResponse response = new FirestationResponse();
-        response.setPersons(infos);
-        response.setNumberOfAdults(adults);
-        response.setNumberOfChildren(children);
-
-        return response;
+        return new FirestationResponse(personsInfo, adults, children);
     }
 
+    /**
+     * Récupère les enfants habitant à une adresse donnée ainsi que les membres du foyer.
+     *
+     * @param address Adresse à rechercher
+     * @return Réponse contenant la liste des enfants et des membres du foyer
+     * @throws IOException en cas d'erreur de lecture des données
+     */
     public ChildAlertResponse getChildrenByAddress(String address) throws IOException {
-        DataWrapper data = dataLoaderService.loadData();
-
-        List<Person> residents = data.getPersons().stream()
-                .filter(p -> p.getAddress().equalsIgnoreCase(address))
-                .collect(Collectors.toList());
+        DataWrapper data = loadData();
 
         List<ChildAlertResponse.Child> children = new ArrayList<>();
         List<ChildAlertResponse.HouseholdMember> household = new ArrayList<>();
 
-        for (Person p : residents) {
-            int age = getAgeByName(p.getFirstName(), p.getLastName());
-
-            if (age < 18) {
-                ChildAlertResponse.Child child = new ChildAlertResponse.Child();
-                child.setFirstName(p.getFirstName());
-                child.setLastName(p.getLastName());
-                child.setAge(age);
-                children.add(child);
-            } else {
-                ChildAlertResponse.HouseholdMember member = new ChildAlertResponse.HouseholdMember();
-                member.setFirstName(p.getFirstName());
-                member.setLastName(p.getLastName());
-                household.add(member);
+        for (Person p : data.getPersons()) {
+            if (p.getAddress().equalsIgnoreCase(address)) {
+                int age = computeAge(findBirthdate(p, data.getMedicalrecords()));
+                if (age < 18) {
+                    children.add(new ChildAlertResponse.Child(p.getFirstName(), p.getLastName(), age));
+                } else {
+                    household.add(new ChildAlertResponse.HouseholdMember(p.getFirstName(), p.getLastName()));
+                }
             }
         }
 
-        ChildAlertResponse response = new ChildAlertResponse();
-        response.setChildren(children);
-        response.setHouseholdMembers(household);
-        return response;
+        return new ChildAlertResponse(children, household);
     }
 
+    /**
+     * Récupère tous les numéros de téléphone des personnes couvertes par une station donnée.
+     *
+     * @param stationNumber Numéro de la station
+     * @return Liste des numéros de téléphone uniques
+     * @throws IOException en cas d'erreur de lecture des données
+     */
     public List<String> getPhoneNumbersByStation(int stationNumber) throws IOException {
-        DataWrapper data = dataLoaderService.loadData();
-
-        List<String> addresses = data.getFirestations().stream()
-                .filter(f -> f.getStation() == stationNumber)
-                .map(Firestation::getAddress)
-                .collect(Collectors.toList());
+        DataWrapper data = loadData();
+        List<String> addresses = getAddressesByStations(Collections.singletonList(stationNumber), data);
 
         return data.getPersons().stream()
                 .filter(p -> addresses.contains(p.getAddress()))
@@ -133,8 +109,15 @@ public class AlertService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Récupère les résidents d'une adresse donnée ainsi que leur numéro de station de pompiers.
+     *
+     * @param address Adresse recherchée
+     * @return Réponse contenant la liste des résidents et le numéro de station associé
+     * @throws IOException en cas d'erreur de lecture des données
+     */
     public FireAddressResponse getResidentsByAddress(String address) throws IOException {
-        DataWrapper data = dataLoaderService.loadData();
+        DataWrapper data = loadData();
 
         Optional<Firestation> firestation = data.getFirestations().stream()
                 .filter(f -> f.getAddress().equalsIgnoreCase(address))
@@ -142,121 +125,201 @@ public class AlertService {
 
         int stationNumber = firestation.map(Firestation::getStation).orElse(0);
 
-        List<Person> persons = data.getPersons().stream()
+        List<FireAddressResponse.Resident> residents = data.getPersons().stream()
                 .filter(p -> p.getAddress().equalsIgnoreCase(address))
+                .map(p -> buildResident(p, data.getMedicalrecords()))
                 .collect(Collectors.toList());
 
-        List<FireAddressResponse.Resident> residents = new ArrayList<>();
-
-        for (Person p : persons) {
-            Optional<MedicalRecord> record = data.getMedicalrecords().stream()
-                    .filter(m -> m.getFirstName().equalsIgnoreCase(p.getFirstName()) &&
-                            m.getLastName().equalsIgnoreCase(p.getLastName()))
-                    .findFirst();
-
-            FireAddressResponse.Resident r = new FireAddressResponse.Resident();
-            r.setFirstName(p.getFirstName());
-            r.setLastName(p.getLastName());
-            r.setPhone(p.getPhone());
-            r.setAge(getAgeByName(p.getFirstName(), p.getLastName()));
-
-            record.ifPresent(med -> {
-                r.setMedications(med.getMedications());
-                r.setAllergies(med.getAllergies());
-            });
-
-            residents.add(r);
-        }
-
-        FireAddressResponse response = new FireAddressResponse();
-        response.setStationNumber(stationNumber);
-        response.setResidents(residents);
-        return response;
+        return new FireAddressResponse(stationNumber, residents);
     }
 
+    /**
+     * Regroupe les habitants par adresse pour toutes les stations spécifiées (alerte inondation).
+     *
+     * @param stationNumbers Liste des numéros de stations
+     * @return Réponse structurée regroupant les foyers par adresse
+     * @throws IOException en cas d'erreur de lecture des données
+     */
     public FloodResponse getFloodData(List<Integer> stationNumbers) throws IOException {
-        DataWrapper data = dataLoaderService.loadData();
+        DataWrapper data = loadData();
+        List<String> addresses = getAddressesByStations(stationNumbers, data);
 
-        List<String> addresses = data.getFirestations().stream()
-                .filter(f -> stationNumbers.contains(f.getStation()))
-                .map(Firestation::getAddress)
-                .distinct()
-                .collect(Collectors.toList());
-
-        Map<String, List<FloodResponse.HouseholdMember>> result = new HashMap<>();
+        Map<String, List<FloodResponse.HouseholdMember>> households = new HashMap<>();
 
         for (String address : addresses) {
             List<FloodResponse.HouseholdMember> members = data.getPersons().stream()
                     .filter(p -> p.getAddress().equalsIgnoreCase(address))
-                    .map(p -> {
-                        FloodResponse.HouseholdMember member = new FloodResponse.HouseholdMember();
-                        member.setFirstName(p.getFirstName());
-                        member.setLastName(p.getLastName());
-                        member.setPhone(p.getPhone());
-                        try {
-                            member.setAge(getAgeByName(p.getFirstName(), p.getLastName()));
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                        data.getMedicalrecords().stream()
-                                .filter(m -> m.getFirstName().equalsIgnoreCase(p.getFirstName()) &&
-                                        m.getLastName().equalsIgnoreCase(p.getLastName()))
-                                .findFirst()
-                                .ifPresent(med -> {
-                                    member.setMedications(med.getMedications());
-                                    member.setAllergies(med.getAllergies());
-                                });
-                        return member;
-                    })
+                    .map(p -> buildHouseholdMember(p, data.getMedicalrecords()))
                     .collect(Collectors.toList());
 
-            result.put(address, members);
+            households.put(address, members);
         }
 
-        FloodResponse response = new FloodResponse();
-        response.setHouseholds(result);
-        return response;
+        return new FloodResponse(households);
     }
 
+    /**
+     * Récupère les informations détaillées d'une personne par son nom de famille.
+     *
+     * @param lastName Nom de famille recherché
+     * @return Liste des informations de personnes correspondantes
+     * @throws IOException en cas d'erreur de lecture des données
+     */
     public List<PersonInfoResponse> getPersonInfo(String lastName) throws IOException {
-        DataWrapper data = dataLoaderService.loadData();
+        DataWrapper data = loadData();
 
         return data.getPersons().stream()
                 .filter(p -> p.getLastName().equalsIgnoreCase(lastName))
-                .map(p -> {
-                    PersonInfoResponse info = new PersonInfoResponse();
-                    info.setFirstName(p.getFirstName());
-                    info.setLastName(p.getLastName());
-                    info.setAddress(p.getAddress());
-                    info.setEmail(p.getEmail());
-
-                    try {
-                        info.setAge(getAgeByName(p.getFirstName(), p.getLastName()));
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-
-                    data.getMedicalrecords().stream()
-                            .filter(m -> m.getFirstName().equalsIgnoreCase(p.getFirstName()) &&
-                                    m.getLastName().equalsIgnoreCase(p.getLastName()))
-                            .findFirst()
-                            .ifPresent(med -> {
-                                info.setMedications(med.getMedications());
-                                info.setAllergies(med.getAllergies());
-                            });
-
-                    return info;
-                })
+                .map(p -> buildPersonInfo(p, data.getMedicalrecords()))
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Récupère tous les emails des personnes habitant dans une ville donnée.
+     *
+     * @param city Nom de la ville
+     * @return Liste des adresses email
+     * @throws IOException en cas d'erreur de lecture des données
+     */
     public List<String> getEmailsByCity(String city) throws IOException {
-        DataWrapper data = dataLoaderService.loadData();
+        DataWrapper data = loadData();
 
         return data.getPersons().stream()
                 .filter(p -> p.getCity().equalsIgnoreCase(city))
                 .map(Person::getEmail)
                 .distinct()
                 .collect(Collectors.toList());
+    }
+
+    // ====== Méthodes privées utilitaires ======
+    /**
+     * Charge les données du fichier JSON via le service DataLoaderService.
+     *
+     * @return L'ensemble des données chargées sous forme de DataWrapper
+     * @throws IOException en cas d'échec de lecture du fichier JSON
+     */
+    private DataWrapper loadData() throws IOException {
+        return dataLoaderService.loadData();
+    }
+
+    /**
+     * Récupère les adresses associées aux numéros de stations spécifiés.
+     *
+     * @param stationNumbers Liste des numéros de stations
+     * @param data Données chargées depuis le fichier JSON
+     * @return Liste d'adresses couvertes par les stations données
+     */
+    private List<String> getAddressesByStations(List<Integer> stationNumbers, DataWrapper data) {
+        return data.getFirestations().stream()
+                .filter(f -> stationNumbers.contains(f.getStation()))
+                .map(Firestation::getAddress)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Cherche la date de naissance d'une personne en fonction de son prénom et nom.
+     *
+     * @param person Personne pour laquelle trouver la date de naissance
+     * @param records Liste des dossiers médicaux
+     * @return Date de naissance au format MM/dd/yyyy, ou "01/01/1970" si non trouvée
+     */
+    private String findBirthdate(Person person, List<MedicalRecord> records) {
+        return records.stream()
+                .filter(m -> m.getFirstName().equalsIgnoreCase(person.getFirstName()) &&
+                        m.getLastName().equalsIgnoreCase(person.getLastName()))
+                .map(MedicalRecord::getBirthdate)
+                .findFirst()
+                .orElse("01/01/1970"); // Valeur par défaut raisonnable
+    }
+
+    /**
+     * Calcule l'âge d'une personne à partir de sa date de naissance.
+     *
+     * @param birthdate Date de naissance au format MM/dd/yyyy
+     * @return Âge actuel en années
+     */
+    private int computeAge(String birthdate) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy");
+        LocalDate birth = LocalDate.parse(birthdate, formatter);
+        return Period.between(birth, LocalDate.now()).getYears();
+    }
+
+    /**
+     * Construit un objet Resident enrichi pour un résident donné.
+     *
+     * @param person La personne concernée
+     * @param records Liste des dossiers médicaux
+     * @return Résident enrichi avec téléphone, âge, médicaments et allergies
+     */
+    private FireAddressResponse.Resident buildResident(Person person, List<MedicalRecord> records) {
+        FireAddressResponse.Resident resident = new FireAddressResponse.Resident();
+        resident.setFirstName(person.getFirstName());
+        resident.setLastName(person.getLastName());
+        resident.setPhone(person.getPhone());
+        resident.setAge(computeAge(findBirthdate(person, records)));
+
+        records.stream()
+                .filter(m -> m.getFirstName().equalsIgnoreCase(person.getFirstName()) &&
+                        m.getLastName().equalsIgnoreCase(person.getLastName()))
+                .findFirst()
+                .ifPresent(m -> {
+                    resident.setMedications(m.getMedications());
+                    resident.setAllergies(m.getAllergies());
+                });
+
+        return resident;
+    }
+
+    /**
+     * Construit un objet HouseholdMember enrichi pour une inondation (flood alert).
+     *
+     * @param person La personne concernée
+     * @param records Liste des dossiers médicaux
+     * @return Membre du foyer enrichi avec téléphone, âge, médicaments et allergies
+     */
+    private FloodResponse.HouseholdMember buildHouseholdMember(Person person, List<MedicalRecord> records) {
+        FloodResponse.HouseholdMember member = new FloodResponse.HouseholdMember();
+        member.setFirstName(person.getFirstName());
+        member.setLastName(person.getLastName());
+        member.setPhone(person.getPhone());
+        member.setAge(computeAge(findBirthdate(person, records)));
+
+        records.stream()
+                .filter(m -> m.getFirstName().equalsIgnoreCase(person.getFirstName()) &&
+                        m.getLastName().equalsIgnoreCase(person.getLastName()))
+                .findFirst()
+                .ifPresent(m -> {
+                    member.setMedications(m.getMedications());
+                    member.setAllergies(m.getAllergies());
+                });
+
+        return member;
+    }
+
+    /**
+     * Construit un objet PersonInfoResponse enrichi pour une personne donnée.
+     * @param person La personne concernée
+     * @param records Liste des dossiers médicaux
+     * @return Informations complètes de la personne (adresse, âge, email, médicaments, allergies)
+     */
+    private PersonInfoResponse buildPersonInfo(Person person, List<MedicalRecord> records) {
+        PersonInfoResponse info = new PersonInfoResponse();
+        info.setFirstName(person.getFirstName());
+        info.setLastName(person.getLastName());
+        info.setAddress(person.getAddress());
+        info.setEmail(person.getEmail());
+        info.setAge(computeAge(findBirthdate(person, records)));
+
+        records.stream()
+                .filter(m -> m.getFirstName().equalsIgnoreCase(person.getFirstName()) &&
+                        m.getLastName().equalsIgnoreCase(person.getLastName()))
+                .findFirst()
+                .ifPresent(m -> {
+                    info.setMedications(m.getMedications());
+                    info.setAllergies(m.getAllergies());
+                });
+
+        return info;
     }
 }

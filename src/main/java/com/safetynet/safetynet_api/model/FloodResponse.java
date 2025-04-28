@@ -16,5 +16,22 @@ public class FloodResponse {
         private int age;
         private List<String> medications;
         private List<String> allergies;
+
+        public HouseholdMember() {}
+
+        public HouseholdMember(String firstName, String lastName, String phone, int age, List<String> medications, List<String> allergies) {
+            this.firstName = firstName;
+            this.lastName = lastName;
+            this.phone = phone;
+            this.age = age;
+            this.medications = medications;
+            this.allergies = allergies;
+        }
+    }
+
+    public FloodResponse() {}
+
+    public FloodResponse(Map<String, List<HouseholdMember>> households) {
+        this.households = households;
     }
 }
