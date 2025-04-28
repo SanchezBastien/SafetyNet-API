@@ -1,7 +1,7 @@
 package com.safetynet.safetynet_api.controller;
 
 import com.safetynet.safetynet_api.model.MedicalRecord;
-import com.safetynet.safetynet_api.service.DataLoaderService;
+import com.safetynet.safetynet_api.service.MedicalRecordService;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -11,20 +11,20 @@ import java.util.List;
 @RequestMapping("/medicalRecord")
 public class MedicalRecordController {
 
-    private final DataLoaderService dataService;
+    private final MedicalRecordService medicalRecordService;
 
-    public MedicalRecordController(DataLoaderService dataService) {
-        this.dataService = dataService;
+    public MedicalRecordController(MedicalRecordService medicalRecordService) {
+        this.medicalRecordService = medicalRecordService;
     }
 
     @GetMapping
     public List<MedicalRecord> getAllMedicalRecords() throws IOException {
-        return dataService.getAllMedicalRecords();
+        return medicalRecordService.getAllMedicalRecords();
     }
 
     @PostMapping
     public MedicalRecord addMedicalRecord(@RequestBody MedicalRecord record) throws IOException {
-        return dataService.addMedicalRecord(record);
+        return medicalRecordService.addMedicalRecord(record);
     }
 
     @PutMapping(produces = "application/json")
@@ -32,13 +32,13 @@ public class MedicalRecordController {
             @RequestParam String firstName,
             @RequestParam String lastName,
             @RequestBody MedicalRecord record) throws IOException {
-        return dataService.updateMedicalRecord(firstName, lastName, record);
+        return medicalRecordService.updateMedicalRecord(firstName, lastName, record);
     }
 
     @DeleteMapping
     public boolean deleteMedicalRecord(
             @RequestParam String firstName,
             @RequestParam String lastName) throws IOException {
-        return dataService.deleteMedicalRecord(firstName, lastName);
+        return medicalRecordService.deleteMedicalRecord(firstName, lastName);
     }
 }

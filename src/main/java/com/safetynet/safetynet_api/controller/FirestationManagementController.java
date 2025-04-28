@@ -2,7 +2,7 @@ package com.safetynet.safetynet_api.controller;
 
 import com.safetynet.safetynet_api.model.Firestation;
 import com.safetynet.safetynet_api.model.PersonInfoResponse;
-import com.safetynet.safetynet_api.service.DataLoaderService;
+import com.safetynet.safetynet_api.service.FirestationService;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -12,29 +12,29 @@ import java.util.List;
 @RequestMapping("/firestation-management")
 public class FirestationManagementController {
 
-    private final DataLoaderService dataService;
+    private final FirestationService firestationService;
 
-    public FirestationManagementController(DataLoaderService dataService) {
-        this.dataService = dataService;
+    public FirestationManagementController(FirestationService firestationService) {
+        this.firestationService = firestationService;
     }
 
     @GetMapping
     public List<Firestation> getAllFirestations() throws IOException {
-        return dataService.getAllFirestations();
+        return firestationService.getAllFirestations();
     }
 
     @PostMapping
     public Firestation addFirestation(@RequestBody Firestation firestation) throws IOException {
-        return dataService.addFirestation(firestation);
+        return firestationService.addFirestation(firestation);
     }
 
     @PutMapping
     public Firestation updateFirestation(@RequestBody Firestation firestation) throws IOException {
-        return dataService.updateFirestation(firestation.getAddress(), firestation.getStation());
+        return firestationService.updateFirestation(firestation.getAddress(), firestation.getStation());
     }
 
     @DeleteMapping
     public boolean deleteFirestation(@RequestParam String address) throws IOException {
-        return dataService.deleteFirestation(address);
+        return firestationService.deleteFirestation(address);
     }
 }

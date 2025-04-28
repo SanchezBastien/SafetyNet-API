@@ -1,7 +1,7 @@
 package com.safetynet.safetynet_api.controller;
 
 import com.safetynet.safetynet_api.model.FirestationResponse;
-import com.safetynet.safetynet_api.service.DataLoaderService;
+import com.safetynet.safetynet_api.service.AlertService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,16 +20,16 @@ public class FirestationController {
     /**
      * Service injecté permettant de charger et manipuler les données à partir du fichier JSON.
      */
-    private final DataLoaderService dataService;
+    private final AlertService alertService;
 
     /**Constructeur injectant le service de chargement des données.*/
-    public FirestationController(DataLoaderService dataService) {
-        this.dataService = dataService;
+    public FirestationController(AlertService alertService) {
+        this.alertService = alertService;
     }
 
     /**Endpoint HTTP */
     @GetMapping
     public FirestationResponse getPersonsByStation(@RequestParam int stationNumber) throws IOException {
-        return dataService.getFirestationResponse(stationNumber);
+        return alertService.getFirestationResponse(stationNumber);
     }
 }

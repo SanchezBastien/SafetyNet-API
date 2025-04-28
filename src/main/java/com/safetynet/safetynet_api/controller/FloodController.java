@@ -1,7 +1,7 @@
 package com.safetynet.safetynet_api.controller;
 
 import com.safetynet.safetynet_api.model.FloodResponse;
-import com.safetynet.safetynet_api.service.DataLoaderService;
+import com.safetynet.safetynet_api.service.AlertService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -14,14 +14,14 @@ import java.util.List;
 @RequestMapping("/flood/stations")
 public class FloodController {
 
-    private final DataLoaderService dataService;
+    private final AlertService alertService;
 
-    public FloodController(DataLoaderService dataService) {
-        this.dataService = dataService;
+    public FloodController(AlertService alertService) {
+        this.alertService = alertService;
     }
 
     @GetMapping
     public FloodResponse getFloodInfo(@RequestParam List<Integer> stations) throws IOException {
-        return dataService.getFloodData(stations);
+        return alertService.getFloodData(stations);
     }
 }

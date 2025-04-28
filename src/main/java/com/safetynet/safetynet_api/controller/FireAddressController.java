@@ -1,7 +1,7 @@
 package com.safetynet.safetynet_api.controller;
 
 import com.safetynet.safetynet_api.model.FireAddressResponse;
-import com.safetynet.safetynet_api.service.DataLoaderService;
+import com.safetynet.safetynet_api.service.AlertService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -13,14 +13,14 @@ import java.io.IOException;
 @RequestMapping("/fire")
 public class FireAddressController {
 
-    private final DataLoaderService dataService;
+    private final AlertService alertService;
 
-    public FireAddressController(DataLoaderService dataService) {
-        this.dataService = dataService;
+    public FireAddressController(AlertService alertService) {
+        this.alertService = alertService;
     }
 
     @GetMapping
     public FireAddressResponse getFireData(@RequestParam String address) throws IOException {
-        return dataService.getResidentsByAddress(address);
+        return alertService.getResidentsByAddress(address);
     }
 }

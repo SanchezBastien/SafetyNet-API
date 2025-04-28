@@ -1,6 +1,6 @@
 package com.safetynet.safetynet_api.controller;
 
-import com.safetynet.safetynet_api.service.DataLoaderService;
+import com.safetynet.safetynet_api.service.AlertService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -13,14 +13,14 @@ import java.util.List;
 @RequestMapping("/communityEmail")
 public class CommunityEmailController {
 
-    private final DataLoaderService dataService;
+    private final AlertService alertService;
 
-    public CommunityEmailController(DataLoaderService dataService) {
-        this.dataService = dataService;
+    public CommunityEmailController(AlertService alertService) {
+        this.alertService = alertService;
     }
 
     @GetMapping
     public List<String> getEmails(@RequestParam String city) throws IOException {
-        return dataService.getEmailsByCity(city);
+        return alertService.getEmailsByCity(city);
     }
 }
