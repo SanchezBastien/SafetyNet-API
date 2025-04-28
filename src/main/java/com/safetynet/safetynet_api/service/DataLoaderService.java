@@ -23,18 +23,18 @@ import java.util.stream.Collectors;
 public class DataLoaderService {
 
     /**
-     * Objet Jackson utilisé pour convertir le JSON en objets Java.
+     * Objet Jackson utilisé pour convertir le JSON en objets Java. (désérialisation)
      */
     private final ObjectMapper objectMapper;
 
     /**
-     * Référence au fichier JSON à charger, injectée depuis les ressources du classpath.
+     * Fait référence au fichier JSON à charger, qui s'injecte depuis le fichier ressources du classpath.
      */
     @Value("classpath:data.json")
     private Resource dataFile;
 
 /**
- * Constructeur injectant l'objet ObjectMapper utilisé pour la désérialisation JSON.
+ * Constructeur injectant l'objet ObjectMapper utilisé pour convertir JSON en objet java (désérialisation).
  * Parametre objectMapper (outil de mapping JSON) en objet Java*/
     public DataLoaderService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -44,6 +44,7 @@ public class DataLoaderService {
     *Sert de point d'entrée pour accéder aux données du fichier
     *return un objet contenant toutes les données du fichier*/
     public DataWrapper loadData() throws IOException {
+        var path = dataFile.getFile().getAbsolutePath();
         return objectMapper.readValue(dataFile.getInputStream(), DataWrapper.class);
     }
 
@@ -332,6 +333,77 @@ public class DataLoaderService {
                 p.getFirstName().equalsIgnoreCase(firstName) &&
                         p.getLastName().equalsIgnoreCase(lastName));
         if (removed) saveData(data);
+        return removed;
+    }
+
+    public List<Firestation> getAllFirestations() throws IOException {
+        DataWrapper data = loadData();
+        return data.getFirestations();
+    }
+
+    public Firestation addFirestation(Firestation firestation) throws IOException {
+        DataWrapper data = loadData();
+        data.getFirestations().add(firestation);
+        saveData(data);
+        return firestation;
+    }
+
+    public Firestation updateFirestation(String address, int newStationNumber) throws IOException {
+        DataWrapper data = loadData();
+
+        for (Firestation f : data.getFirestations()) {
+            if (f.getAddress().equalsIgnoreCase(address)) {
+                f.setStation(newStationNumber);
+                saveData(data);
+                return f;
+            }
+        }
+        return null;
+    }
+
+    public boolean deleteFirestation(String address) throws IOException {
+        DataWrapper data = loadData();
+        boolean removed = data.getFirestations().removeIf(f -> f.getAddress().equalsIgnoreCase(address));
+        if (removed) {
+            saveData(data);
+        }
+        return removed;
+    }
+
+    public List<MedicalRecord> getAllMedicalRecords() throws IOException {
+        DataWrapper data = loadData();
+        return data.getMedicalrecords();
+    }
+
+    public MedicalRecord addMedicalRecord(MedicalRecord record) throws IOException {
+        DataWrapper data = loadData();
+        data.getMedicalrecords().add(record);
+        saveData(data);
+        return record;
+    }
+
+    public MedicalRecord updateMedicalRecord(String firstName, String lastName, MedicalRecord updatedRecord) throws IOException {
+        DataWrapper data = loadData();
+
+        for (int i = 0; i < data.getMedicalrecords().size(); i++) {
+            MedicalRecord m = data.getMedicalrecords().get(i);
+            if (m.getFirstName().equalsIgnoreCase(firstName) && m.getLastName().equalsIgnoreCase(lastName)) {
+                data.getMedicalrecords().set(i, updatedRecord);
+                saveData(data);
+                return updatedRecord;
+            }
+        }
+        return null;
+    }
+
+    public boolean deleteMedicalRecord(String firstName, String lastName) throws IOException {
+        DataWrapper data = loadData();
+        boolean removed = data.getMedicalrecords().removeIf(m ->
+                m.getFirstName().equalsIgnoreCase(firstName) &&
+                        m.getLastName().equalsIgnoreCase(lastName));
+        if (removed) {
+            saveData(data);
+        }
         return removed;
     }
 }

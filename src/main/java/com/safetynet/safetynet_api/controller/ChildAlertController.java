@@ -7,6 +7,10 @@ import com.safetynet.safetynet_api.model.ChildAlertResponse;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+/**RestController indique que ce qui suit est une classe qui expose une API REST.
+ * Les méthodes retournent directement des données (JSON...)
+ * @RequestMapping sert à définir le chemin de base pour toutes les méthodes de la classe.
+ */
 @RestController
 @RequestMapping("/childAlert")
 public class ChildAlertController {
