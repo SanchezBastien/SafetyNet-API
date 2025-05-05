@@ -3,6 +3,7 @@ package com.safetynet.safetynet_api.controller;
 import com.safetynet.safetynet_api.model.Firestation;
 import com.safetynet.safetynet_api.model.PersonInfoResponse;
 import com.safetynet.safetynet_api.service.FirestationService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -23,8 +24,9 @@ public class FirestationManagementController {
         return firestationService.getAllFirestations();
     }
 
+    //pour endpoint service
     @PostMapping
-    public Firestation addFirestation(@RequestBody Firestation firestation) throws IOException {
+    public Firestation addFirestation(@RequestBody @Valid Firestation firestation) throws IOException {
         return firestationService.addFirestation(firestation);
     }
 

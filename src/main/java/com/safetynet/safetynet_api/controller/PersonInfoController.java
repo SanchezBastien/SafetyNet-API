@@ -4,6 +4,7 @@ import com.safetynet.safetynet_api.model.Person;
 import com.safetynet.safetynet_api.model.PersonInfoResponse;
 import com.safetynet.safetynet_api.service.AlertService;
 import com.safetynet.safetynet_api.service.PersonService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -26,8 +27,9 @@ public class PersonInfoController {
         return alertService.getPersonInfo(lastName);
     }
 
+    //pour endpoint service
     @PostMapping
-    public Person addPerson(@RequestBody Person person) throws IOException {
+    public Person addPerson(@RequestBody @Valid Person person) throws IOException {
         return personService.addPerson(person);
     }
 

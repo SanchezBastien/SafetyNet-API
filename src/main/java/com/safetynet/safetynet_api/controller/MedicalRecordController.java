@@ -2,6 +2,7 @@ package com.safetynet.safetynet_api.controller;
 
 import com.safetynet.safetynet_api.model.MedicalRecord;
 import com.safetynet.safetynet_api.service.MedicalRecordService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -22,8 +23,9 @@ public class MedicalRecordController {
         return medicalRecordService.getAllMedicalRecords();
     }
 
+    //pour endpoint service
     @PostMapping
-    public MedicalRecord addMedicalRecord(@RequestBody MedicalRecord record) throws IOException {
+    public MedicalRecord addMedicalRecord(@RequestBody @Valid MedicalRecord record) throws IOException {
         return medicalRecordService.addMedicalRecord(record);
     }
 

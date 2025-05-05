@@ -1,5 +1,6 @@
 package com.safetynet.safetynet_api.service;
 
+import com.safetynet.safetynet_api.exception.DataLoadingException;
 import com.safetynet.safetynet_api.model.*;
 import org.springframework.stereotype.Service;
 
@@ -12,13 +13,11 @@ import java.util.stream.Collectors;
 
 /**
  * Service de traitement des différentes alertes basées sur les données du fichier JSON.
- *
  * Fournit des méthodes pour :
  * - Obtenir les résidents par caserne ou adresse
  * - Extraire les numéros de téléphone ou emails
  * - Regrouper les foyers pour une alerte inondation
  * - Calculer l'âge des individus
- *
  * Ce service centralise les logiques complexes de filtrage et de transformation de données.
  */
 @Service
@@ -37,68 +36,69 @@ public class AlertService {
     /**
      * Récupère les personnes desservies par une station de pompiers donnée,
      * ainsi que le nombre d'adultes et d'enfants parmi eux.
-     *
      * @param stationNumber Numéro de la station de pompiers
      * @return Réponse structurée avec informations des personnes et comptage adultes/enfants
      * @throws IOException en cas d'erreur de lecture du fichier de données
      */
-    public FirestationResponse getFirestationResponse(int stationNumber) throws IOException {
+    public FirestationResponse getFirestationResponse(int stationNumber) {
         DataWrapper data = loadData();
         List<String> addresses = getAddressesByStations(Collections.singletonList(stationNumber), data);
 
-        List<FirestationResponse.PersonInfo> personsInfo = new ArrayList<>();
-        int adults = 0;
-        int children = 0;
+        List<FirestationResponse.PersonInfo> personsInfo = data.getPersons().stream()
+                .filter(p -> addresses.contains(p.getAddress()))
+                .map(p -> new FirestationResponse.PersonInfo(
+                        p.getFirstName(), p.getLastName(), p.getAddress(), p.getPhone()))
+                .collect(Collectors.toList());
 
-        for (Person p : data.getPersons()) {
-            if (addresses.contains(p.getAddress())) {
-                int age = computeAge(findBirthdate(p, data.getMedicalrecords()));
-                if (age < 18) children++;
-                else adults++;
+        long children = data.getPersons().stream()
+                .filter(p -> addresses.contains(p.getAddress()))
+                .map(p -> computeAge(findBirthdate(p, data.getMedicalrecords())))
+                .filter(age -> age < 18)
+                .count();
 
-                personsInfo.add(new FirestationResponse.PersonInfo(
-                        p.getFirstName(), p.getLastName(), p.getAddress(), p.getPhone()));
-            }
-        }
+        int total = personsInfo.size();
+        int adults = (int)(total - children);
 
-        return new FirestationResponse(personsInfo, adults, children);
+        return new FirestationResponse(personsInfo, adults, (int) children);
     }
+
 
     /**
      * Récupère les enfants habitant à une adresse donnée ainsi que les membres du foyer.
-     *
      * @param address Adresse à rechercher
      * @return Réponse contenant la liste des enfants et des membres du foyer
      * @throws IOException en cas d'erreur de lecture des données
      */
-    public ChildAlertResponse getChildrenByAddress(String address) throws IOException {
+    public ChildAlertResponse getChildrenByAddress(String address) {
         DataWrapper data = loadData();
 
-        List<ChildAlertResponse.Child> children = new ArrayList<>();
-        List<ChildAlertResponse.HouseholdMember> household = new ArrayList<>();
+        List<Person> personsAtAddress = data.getPersons().stream()
+                .filter(p -> p.getAddress().equalsIgnoreCase(address))
+                .collect(Collectors.toList());
 
-        for (Person p : data.getPersons()) {
-            if (p.getAddress().equalsIgnoreCase(address)) {
-                int age = computeAge(findBirthdate(p, data.getMedicalrecords()));
-                if (age < 18) {
-                    children.add(new ChildAlertResponse.Child(p.getFirstName(), p.getLastName(), age));
-                } else {
-                    household.add(new ChildAlertResponse.HouseholdMember(p.getFirstName(), p.getLastName()));
-                }
-            }
-        }
+        List<ChildAlertResponse.Child> children = personsAtAddress.stream()
+                .filter(p -> computeAge(findBirthdate(p, data.getMedicalrecords())) < 18)
+                .map(p -> new ChildAlertResponse.Child(
+                        p.getFirstName(), p.getLastName(),
+                        computeAge(findBirthdate(p, data.getMedicalrecords()))))
+                .collect(Collectors.toList());
+
+        List<ChildAlertResponse.HouseholdMember> household = personsAtAddress.stream()
+                .filter(p -> computeAge(findBirthdate(p, data.getMedicalrecords())) >= 18)
+                .map(p -> new ChildAlertResponse.HouseholdMember(
+                        p.getFirstName(), p.getLastName()))
+                .collect(Collectors.toList());
 
         return new ChildAlertResponse(children, household);
     }
 
     /**
      * Récupère tous les numéros de téléphone des personnes couvertes par une station donnée.
-     *
      * @param stationNumber Numéro de la station
      * @return Liste des numéros de téléphone uniques
      * @throws IOException en cas d'erreur de lecture des données
      */
-    public List<String> getPhoneNumbersByStation(int stationNumber) throws IOException {
+    public List<String> getPhoneNumbersByStation(int stationNumber) {
         DataWrapper data = loadData();
         List<String> addresses = getAddressesByStations(Collections.singletonList(stationNumber), data);
 
@@ -111,12 +111,11 @@ public class AlertService {
 
     /**
      * Récupère les résidents d'une adresse donnée ainsi que leur numéro de station de pompiers.
-     *
      * @param address Adresse recherchée
      * @return Réponse contenant la liste des résidents et le numéro de station associé
      * @throws IOException en cas d'erreur de lecture des données
      */
-    public FireAddressResponse getResidentsByAddress(String address) throws IOException {
+    public FireAddressResponse getResidentsByAddress(String address) {
         DataWrapper data = loadData();
 
         Optional<Firestation> firestation = data.getFirestations().stream()
@@ -135,12 +134,11 @@ public class AlertService {
 
     /**
      * Regroupe les habitants par adresse pour toutes les stations spécifiées (alerte inondation).
-     *
      * @param stationNumbers Liste des numéros de stations
      * @return Réponse structurée regroupant les foyers par adresse
      * @throws IOException en cas d'erreur de lecture des données
      */
-    public FloodResponse getFloodData(List<Integer> stationNumbers) throws IOException {
+    public FloodResponse getFloodData(List<Integer> stationNumbers) {
         DataWrapper data = loadData();
         List<String> addresses = getAddressesByStations(stationNumbers, data);
 
@@ -160,12 +158,11 @@ public class AlertService {
 
     /**
      * Récupère les informations détaillées d'une personne par son nom de famille.
-     *
      * @param lastName Nom de famille recherché
      * @return Liste des informations de personnes correspondantes
      * @throws IOException en cas d'erreur de lecture des données
      */
-    public List<PersonInfoResponse> getPersonInfo(String lastName) throws IOException {
+    public List<PersonInfoResponse> getPersonInfo(String lastName) {
         DataWrapper data = loadData();
 
         return data.getPersons().stream()
@@ -176,7 +173,6 @@ public class AlertService {
 
     /**
      * Récupère tous les emails des personnes habitant dans une ville donnée.
-     *
      * @param city Nom de la ville
      * @return Liste des adresses email
      * @throws IOException en cas d'erreur de lecture des données
@@ -192,19 +188,22 @@ public class AlertService {
     }
 
     // ====== Méthodes privées utilitaires ======
+
     /**
      * Charge les données du fichier JSON via le service DataLoaderService.
-     *
      * @return L'ensemble des données chargées sous forme de DataWrapper
      * @throws IOException en cas d'échec de lecture du fichier JSON
      */
-    private DataWrapper loadData() throws IOException {
-        return dataLoaderService.loadData();
+    private DataWrapper loadData() {
+        try {
+            return dataLoaderService.loadData();
+        } catch (IOException e) {
+            throw new DataLoadingException("Erreur lors du chargement des données", e);
+        }
     }
 
     /**
      * Récupère les adresses associées aux numéros de stations spécifiés.
-     *
      * @param stationNumbers Liste des numéros de stations
      * @param data Données chargées depuis le fichier JSON
      * @return Liste d'adresses couvertes par les stations données
@@ -218,8 +217,7 @@ public class AlertService {
     }
 
     /**
-     * Cherche la date de naissance d'une personne en fonction de son prénom et nom.
-     *
+     * Cherche la date de naissance d'une personne en fonction de son prénom et nom
      * @param person Personne pour laquelle trouver la date de naissance
      * @param records Liste des dossiers médicaux
      * @return Date de naissance au format MM/dd/yyyy, ou "01/01/1970" si non trouvée
@@ -235,7 +233,6 @@ public class AlertService {
 
     /**
      * Calcule l'âge d'une personne à partir de sa date de naissance.
-     *
      * @param birthdate Date de naissance au format MM/dd/yyyy
      * @return Âge actuel en années
      */
@@ -247,7 +244,6 @@ public class AlertService {
 
     /**
      * Construit un objet Resident enrichi pour un résident donné.
-     *
      * @param person La personne concernée
      * @param records Liste des dossiers médicaux
      * @return Résident enrichi avec téléphone, âge, médicaments et allergies
@@ -273,7 +269,6 @@ public class AlertService {
 
     /**
      * Construit un objet HouseholdMember enrichi pour une inondation (flood alert).
-     *
      * @param person La personne concernée
      * @param records Liste des dossiers médicaux
      * @return Membre du foyer enrichi avec téléphone, âge, médicaments et allergies
