@@ -27,4 +27,16 @@ public class DataLoaderService {
     public void saveData(DataWrapper data) throws IOException {
         objectMapper.writeValue(dataFile.getFile(), data);
     }
+
+    public Object getPersons() {
+        return null;
+    }
+
+    public Object getFirestations() {
+        return null;
+    }
+
+    public Object getMedicalRecords() {
+        return null;
+    }
 }

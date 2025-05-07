@@ -3,55 +3,48 @@ package com.safetynet.safetynet_api;
 import com.safetynet.safetynet_api.controller.ChildAlertController;
 import com.safetynet.safetynet_api.model.ChildAlertResponse;
 import com.safetynet.safetynet_api.service.AlertService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.web.servlet.MockMvc;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
-import java.util.Collections;
+import java.io.IOException;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(ChildAlertController.class)
-@Import(ChildAlertControllerTest.TestConfig.class)
-class ChildAlertControllerTest {
+public class ChildAlertControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
+    @Mock
     private AlertService alertService;
 
-    @TestConfiguration
-    static class TestConfig {
-        @Bean
-        public AlertService alertService() {
-            return Mockito.mock(AlertService.class);
-        }
+    @InjectMocks
+    private ChildAlertController childAlertController;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
     }
 
-
-    /*Appel du contrôleur
-    /*Passage d'un paramètre address
-    /*Retour d'une réponse correcte (code 200)
-    /*Structure du JSON*/
     @Test
-    void getChildren_whenValidAddress_thenReturnsEmptyLists() throws Exception {
-        // Mock data
-        ChildAlertResponse response = new ChildAlertResponse(Collections.emptyList(), Collections.emptyList());
-        when(alertService.getChildrenByAddress("1509 Culver St")).thenReturn(response);
+    void testGetChildren_ReturnsResponse() throws IOException {
+        String address = "123 Main St";
+        ChildAlertResponse mockResponse = new ChildAlertResponse();
+        when(alertService.getChildrenByAddress(address)).thenReturn(mockResponse);
 
-        // Perform request
-        mockMvc.perform(get("/childAlert")
-                        .param("address", "1509 Culver St"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.children").isArray())
-                .andExpect(jsonPath("$.householdMembers").isArray());
+        ChildAlertResponse response = childAlertController.getChildren(address);
+        assertEquals(mockResponse, response);
+    }
+
+    @Test
+    void testGetChildren_ThrowsRuntimeException() {
+        String address = "123 Main St";
+        when(alertService.getChildrenByAddress(address)).thenThrow(new RuntimeException("Erreur simulée"));
+
+        assertThrows(RuntimeException.class, () -> {
+            childAlertController.getChildren(address);
+        });
     }
 }

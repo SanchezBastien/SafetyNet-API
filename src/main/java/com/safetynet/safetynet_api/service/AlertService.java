@@ -310,4 +310,8 @@ public class AlertService {
 
         return info;
     }
+
+    public Object getPersonInfo(String john, String doe) {
+        return null;
+    }
 }
