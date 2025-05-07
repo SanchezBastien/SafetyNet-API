@@ -38,7 +38,6 @@ public class AlertService {
      * ainsi que le nombre d'adultes et d'enfants parmi eux.
      * @param stationNumber Numéro de la station de pompiers
      * @return Réponse structurée avec informations des personnes et comptage adultes/enfants
-     * @throws IOException en cas d'erreur de lecture du fichier de données
      */
     public FirestationResponse getFirestationResponse(int stationNumber) {
         DataWrapper data = loadData();
@@ -67,7 +66,6 @@ public class AlertService {
      * Récupère les enfants habitant à une adresse donnée ainsi que les membres du foyer.
      * @param address Adresse à rechercher
      * @return Réponse contenant la liste des enfants et des membres du foyer
-     * @throws IOException en cas d'erreur de lecture des données
      */
     public ChildAlertResponse getChildrenByAddress(String address) {
         DataWrapper data = loadData();
@@ -96,7 +94,6 @@ public class AlertService {
      * Récupère tous les numéros de téléphone des personnes couvertes par une station donnée.
      * @param stationNumber Numéro de la station
      * @return Liste des numéros de téléphone uniques
-     * @throws IOException en cas d'erreur de lecture des données
      */
     public List<String> getPhoneNumbersByStation(int stationNumber) {
         DataWrapper data = loadData();
@@ -113,7 +110,6 @@ public class AlertService {
      * Récupère les résidents d'une adresse donnée ainsi que leur numéro de station de pompiers.
      * @param address Adresse recherchée
      * @return Réponse contenant la liste des résidents et le numéro de station associé
-     * @throws IOException en cas d'erreur de lecture des données
      */
     public FireAddressResponse getResidentsByAddress(String address) {
         DataWrapper data = loadData();
@@ -136,7 +132,6 @@ public class AlertService {
      * Regroupe les habitants par adresse pour toutes les stations spécifiées (alerte inondation).
      * @param stationNumbers Liste des numéros de stations
      * @return Réponse structurée regroupant les foyers par adresse
-     * @throws IOException en cas d'erreur de lecture des données
      */
     public FloodResponse getFloodData(List<Integer> stationNumbers) {
         DataWrapper data = loadData();
@@ -160,7 +155,6 @@ public class AlertService {
      * Récupère les informations détaillées d'une personne par son nom de famille.
      * @param lastName Nom de famille recherché
      * @return Liste des informations de personnes correspondantes
-     * @throws IOException en cas d'erreur de lecture des données
      */
     public List<PersonInfoResponse> getPersonInfo(String lastName) {
         DataWrapper data = loadData();
@@ -192,7 +186,6 @@ public class AlertService {
     /**
      * Charge les données du fichier JSON via le service DataLoaderService.
      * @return L'ensemble des données chargées sous forme de DataWrapper
-     * @throws IOException en cas d'échec de lecture du fichier JSON
      */
     private DataWrapper loadData() {
         try {

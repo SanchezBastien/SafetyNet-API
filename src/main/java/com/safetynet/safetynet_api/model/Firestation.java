@@ -12,4 +12,13 @@ public class Firestation {
 
     @Min(value = 1, message = "Le numéro de station doit être supérieur ou égal à 1")
     private int station;
+
+    public Firestation() {
+    }
+
+    public Firestation(String address, int station) {
+        this.address = address;
+        this.station = station;
+    }
+
 }

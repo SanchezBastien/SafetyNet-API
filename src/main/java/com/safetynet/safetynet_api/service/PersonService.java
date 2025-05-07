@@ -46,4 +46,8 @@ public class PersonService {
         }
         return removed;
     }
+
+    public Object getPersonsByAddress(String s) {
+        return null;
+    }
 }
